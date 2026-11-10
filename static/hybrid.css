@@ -1,28 +1,29 @@
 /* ==========================================================================
-   CATHODE HYBRID — web layer (v3.0)
-   House style: smooth everything, pixel numbers only.
-   Source of truth for tokens: Shared/design/hybrid/tokens-hybrid.json
-   Owner of the spec: Viselino. Owner of this file / rollout: ManNager.
+   CATHODE HYBRID — web layer (omanet fork, v4 "round")
+   Based on Shared/design/hybrid/web/hybrid.css (Viselino / ManNager).
+   Local change, 2026-11-10: the pixel layer is gone by user directive
+   ("no more pixelated shit, always round and beautiful"). Big numbers are
+   Manrope 800 with tabular figures; the rest of the language is unchanged.
 
    RULES
-   1. Big numbers = Silkscreen, integer px, no letter-spacing tweaks.
+   1. Big numbers = Manrope 800, tabular, -1 px tracking, never pixelated.
    2. Everything else = JetBrains Mono, antialiased, normal tracking.
-   3. Never mix the two layers inside one element.
-   4. 8 px rhythm, 1 px hairlines, radius 3 (2 for chips/cells), no drop shadows.
+   3. 8 px rhythm, 1 px hairlines, radius 8 (6 for chips/cells), no drop shadows.
       Glow only via `filter: drop-shadow(0 0 6px <accent>)` on one element per card.
+   4. Small labels use --hy-dim (7.0:1); --hy-mute is for icons/disabled only.
    ========================================================================== */
 
 @font-face {
-  font-family: "Silkscreen";
-  src: url("fonts/Silkscreen-Regular.ttf") format("truetype");
-  font-weight: 400;
+  font-family: "Manrope";
+  src: url("fonts/manrope-latin-800-normal.woff2") format("woff2");
+  font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: "Silkscreen";
-  src: url("fonts/Silkscreen-Bold.ttf") format("truetype");
-  font-weight: 700;
+  font-family: "Manrope";
+  src: url("fonts/manrope-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
@@ -54,9 +55,9 @@
   --hy-violet: #8A6BFF;
 
   --hy-sans: "JBM", "JetBrains Mono", ui-monospace, monospace;
-  --hy-pixel: "Silkscreen", "JBM", monospace;
-  --hy-r: 3px;
-  --hy-r-sm: 2px;
+  --hy-pixel: "Manrope", "JBM", system-ui, sans-serif;
+  --hy-r: 8px;
+  --hy-r-sm: 6px;
   --hy-gap: 8px;
 
   color: var(--hy-ink);
@@ -109,13 +110,13 @@
 .hy-red  { color: var(--hy-red); }
 .hy-magenta { color: var(--hy-magenta); }
 
-/* ---------- pixel numbers ------------------------------------------------ */
+/* ---------- big numbers (round) ------------------------------------------ */
 
 .hy-num {
   font-family: var(--hy-pixel);
-  font-weight: 400;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: 0;
+  letter-spacing: -1px;
   color: var(--hy-ink);
   font-variant-numeric: tabular-nums;
 }
