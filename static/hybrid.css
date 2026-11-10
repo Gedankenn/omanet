@@ -1,0 +1,273 @@
+/* ==========================================================================
+   CATHODE HYBRID — web layer (v3.0)
+   House style: smooth everything, pixel numbers only.
+   Source of truth for tokens: Shared/design/hybrid/tokens-hybrid.json
+   Owner of the spec: Viselino. Owner of this file / rollout: ManNager.
+
+   RULES
+   1. Big numbers = Silkscreen, integer px, no letter-spacing tweaks.
+   2. Everything else = JetBrains Mono, antialiased, normal tracking.
+   3. Never mix the two layers inside one element.
+   4. 8 px rhythm, 1 px hairlines, radius 3 (2 for chips/cells), no drop shadows.
+      Glow only via `filter: drop-shadow(0 0 6px <accent>)` on one element per card.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Silkscreen";
+  src: url("fonts/Silkscreen-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Silkscreen";
+  src: url("fonts/Silkscreen-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JBM";
+  src: url("fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+.hy, .hy * { box-sizing: border-box; }
+
+.hy {
+  /* palette — contrast on #06070C: ink 17.0:1, dim 7.0, mute 4.2, cyan 12.7, lime 15.3 */
+  --hy-bg: #06070C;
+  --hy-sunken: #0A0C14;
+  --hy-panel: #0C1018;
+  --hy-line: #1B2433;
+  --hy-line-hi: #2C3A50;
+  --hy-ink: #DDF6FF;
+  --hy-dim: #8B9FB3;
+  --hy-mute: #66788C;
+  --hy-cyan: #22E8FF;
+  --hy-magenta: #FF2E88;
+  --hy-lime: #9CFF4A;
+  --hy-amber: #FFC24A;
+  --hy-red: #FF4D5E;
+  --hy-violet: #8A6BFF;
+
+  --hy-sans: "JBM", "JetBrains Mono", ui-monospace, monospace;
+  --hy-pixel: "Silkscreen", "JBM", monospace;
+  --hy-r: 3px;
+  --hy-r-sm: 2px;
+  --hy-gap: 8px;
+
+  color: var(--hy-ink);
+  background: var(--hy-bg);
+  font: 400 12px/1.5 var(--hy-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+/* ---------- surfaces ------------------------------------------------------ */
+
+.hy-card {
+  position: relative;
+  border: 1px solid var(--hy-line);
+  border-radius: var(--hy-r);
+  background: linear-gradient(180deg, var(--hy-panel), #090C13);
+  padding: 12px 14px;
+}
+/* accent = 1 px top hairline at 45 % */
+.hy-card::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: -1px; height: 1px;
+  border-radius: var(--hy-r) var(--hy-r) 0 0;
+  background: var(--hy-line);
+  opacity: .9;
+}
+.hy-card--cyan::before   { background: var(--hy-cyan);    opacity: .45; }
+.hy-card--magenta::before{ background: var(--hy-magenta); opacity: .45; }
+.hy-card--lime::before   { background: var(--hy-lime);    opacity: .45; }
+.hy-card--amber::before  { background: var(--hy-amber);   opacity: .45; }
+.hy-card--violet::before { background: var(--hy-violet);  opacity: .45; }
+
+.hy-label {
+  font-size: 9px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--hy-mute);
+}
+.hy-title {
+  font-size: 11px;
+  letter-spacing: .4px;
+  color: var(--hy-dim);
+}
+.hy-dim  { color: var(--hy-dim); }
+.hy-mute { color: var(--hy-mute); }
+.hy-cyan { color: var(--hy-cyan); }
+.hy-lime { color: var(--hy-lime); }
+.hy-amber{ color: var(--hy-amber); }
+.hy-red  { color: var(--hy-red); }
+.hy-magenta { color: var(--hy-magenta); }
+
+/* ---------- pixel numbers ------------------------------------------------ */
+
+.hy-num {
+  font-family: var(--hy-pixel);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--hy-ink);
+  font-variant-numeric: tabular-nums;
+}
+.hy-num--40 { font-size: 40px; }
+.hy-num--32 { font-size: 32px; }
+.hy-num--24 { font-size: 24px; }
+.hy-num--16 { font-size: 16px; }
+.hy-num .hy-unit { font-size: .45em; color: var(--hy-mute); margin-left: .25em; }
+
+/* ---------- chips -------------------------------------------------------- */
+
+.hy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--hy-line);
+  border-radius: var(--hy-r-sm);
+  padding: 3px 7px;
+  font-size: 9px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--hy-dim);
+  white-space: nowrap;
+}
+.hy-chip--ok     { color: var(--hy-lime);  border-color: color-mix(in srgb, var(--hy-lime) 40%, transparent); }
+.hy-chip--warn   { color: var(--hy-amber); border-color: color-mix(in srgb, var(--hy-amber) 40%, transparent); }
+.hy-chip--bad    { color: var(--hy-red);   border-color: color-mix(in srgb, var(--hy-red) 45%, transparent); }
+.hy-chip--active { color: var(--hy-magenta); border-color: color-mix(in srgb, var(--hy-magenta) 50%, transparent); }
+
+/* ---------- gauge -------------------------------------------------------- */
+
+.hy-gauge {
+  height: 4px;
+  border-radius: var(--hy-r-sm);
+  background: var(--hy-sunken);
+  border: 1px solid var(--hy-line);
+  overflow: hidden;
+}
+.hy-gauge > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hy-cyan);
+  transition: width .35s cubic-bezier(.2, .7, .2, 1);
+}
+.hy-gauge--lime > i  { background: var(--hy-lime); }
+.hy-gauge--amber > i { background: var(--hy-amber); }
+.hy-gauge--red > i   { background: var(--hy-red); }
+
+/* ---------- spark (SVG) -------------------------------------------------- */
+
+.hy-spark { display: block; width: 100%; height: 46px; overflow: visible; }
+.hy-spark .hy-spark-line {
+  fill: none;
+  stroke: var(--hy-cyan);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--hy-cyan) 55%, transparent));
+}
+.hy-spark .hy-spark-fill { fill: url(#hySparkFill); opacity: .32; }
+.hy-spark .hy-spark-dot  { fill: var(--hy-ink); r: 1.7; }
+.hy-spark .hy-spark-grid { stroke: var(--hy-line); stroke-width: 1; stroke-dasharray: 1 4; }
+
+/* ---------- presence matrix ---------------------------------------------- */
+
+.hy-matrix {
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  gap: 2px;
+}
+.hy-matrix b {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--hy-r-sm);
+  background: var(--hy-sunken);
+  border: 1px solid var(--hy-line);
+}
+.hy-matrix b.seen   { background: color-mix(in srgb, var(--hy-line-hi) 70%, transparent); border-color: var(--hy-line-hi); }
+.hy-matrix b.online { background: var(--hy-lime); border-color: var(--hy-lime); box-shadow: 0 0 5px color-mix(in srgb, var(--hy-lime) 60%, transparent); }
+
+/* ---------- table -------------------------------------------------------- */
+
+.hy-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.hy-table th {
+  text-align: left; font-weight: 400; color: var(--hy-mute);
+  font-size: 9px; letter-spacing: .8px; text-transform: uppercase;
+  padding: 0 8px 6px; border-bottom: 1px solid var(--hy-line);
+}
+.hy-table td { padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--hy-line) 55%, transparent); color: var(--hy-dim); }
+.hy-table tr:last-child td { border-bottom: 0; }
+.hy-table td.hy-k { color: var(--hy-ink); }
+
+/* ---------- tabs --------------------------------------------------------- */
+
+.hy-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.hy-tab {
+  appearance: none;
+  border: 1px solid var(--hy-line);
+  border-radius: var(--hy-r-sm);
+  background: var(--hy-sunken);
+  color: var(--hy-dim);
+  font: 400 10px/1 var(--hy-sans);
+  letter-spacing: .8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  min-height: 28px;
+}
+.hy-tab[aria-selected="true"], .hy-tab[aria-current="page"] {
+  color: var(--hy-ink);
+  border-color: color-mix(in srgb, var(--hy-cyan) 55%, transparent);
+  background: color-mix(in srgb, var(--hy-cyan) 8%, var(--hy-sunken));
+}
+.hy-tab:focus-visible { outline: 1px solid var(--hy-cyan); outline-offset: 1px; }
+
+/* ---------- 10-foot tiles (omsaver home, TV) ----------------------------- */
+
+.hy-tile {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--hy-line);
+  border-radius: var(--hy-r);
+  background: linear-gradient(180deg, var(--hy-panel), #090C13);
+  color: inherit;
+  text-decoration: none;
+  position: relative;
+}
+.hy-tile::after {
+  content: ""; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 2px;
+  border-radius: 2px; background: transparent;
+}
+.hy-tile:focus-visible,
+.hy-tile.is-focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--hy-cyan) 60%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hy-cyan) 7%, var(--hy-panel)), #090C13);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hy-cyan) 25%, transparent),
+              0 0 18px color-mix(in srgb, var(--hy-cyan) 22%, transparent);
+}
+.hy-tile.is-focus::after { background: var(--hy-cyan); }
+.hy-tile .hy-tile-name { font-size: 17px; letter-spacing: .2px; color: var(--hy-ink); }
+.hy-tile .hy-tile-role { font-size: 10px; color: var(--hy-mute); margin-top: 2px; }
+.hy-tile .hy-tile-url  { font-size: 10px; color: var(--hy-dim); font-variant-numeric: tabular-nums; }
+
+/* ---------- misc --------------------------------------------------------- */
+
+.hy-rule { border: 0; border-top: 1px solid var(--hy-line); margin: 0; }
+.hy-bloom { filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 45%, transparent)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hy * { transition: none !important; animation: none !important; }
+}
