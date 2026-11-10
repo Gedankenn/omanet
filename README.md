@@ -61,20 +61,39 @@ cd omanet
 docker compose up -d --build
 ```
 
-Abra `http://IP-DO-HOST:20211`.
+Por padrão o app escuta em `127.0.0.1:20211` (só esta máquina) e sem senha.
+Abra `http://127.0.0.1:20211`.
 
-O container usa `network_mode: host` porque ARP precisa da interface real.
-Se o host tiver firewall, libere a porta:
+Para ver de outro aparelho da LAN é obrigatório um token — sem ele o app
+recusa subir fora do loopback:
 
 ```bash
-sudo ufw allow 20211/tcp
+export BIND=0.0.0.0
+export OMANET_TOKEN="$(openssl rand -hex 16)"   # guarde no cofre
+docker compose up -d --build
 ```
+
+O navegador pede login (usuário livre, senha = token). O container usa
+`network_mode: host` porque ARP precisa da interface real; isso expõe a porta
+direto na LAN, então o token é a barreira.
+
+## Segurança
+
+- Sem `OMANET_TOKEN`, o app só escuta em loopback e se recusa a subir em
+  `0.0.0.0`/IP de LAN.
+- Autenticação: HTTP Basic em toda rota (inclusive estáticos e API); senha é
+  o token, comparada com `hmac.compare_digest`.
+- O banco guarda inventário de MAC/IP da rede: trate `data/omanet.db` como
+  dado sensível e não commite.
+- Não libere a porta no firewall além do necessário; prefira tailnet/VPN.
 
 ## Configuração
 
 | Variável | Padrão | O que faz |
 |---|---|---|
 | `PORT` | `20211` | porta do dashboard e da API |
+| `BIND` | `127.0.0.1` | endereço de escuta; fora do loopback exige `OMANET_TOKEN` |
+| `OMANET_TOKEN` | vazio | senha do HTTP Basic; vazio = sem auth (só loopback) |
 | `IFACE` | detecta via `ip route` | interface do scan (ex.: `enp6s0`, `eth0`) |
 | `SCAN_INTERVAL` | `60` | segundos entre sweeps |
 | `DB_PATH` | `/data/omanet.db` | caminho do SQLite dentro do container |
