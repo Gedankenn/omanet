@@ -61,20 +61,42 @@ cd omanet
 docker compose up -d --build
 ```
 
-Abra `http://IP-DO-HOST:20211`.
+Por padrão o app escuta em `127.0.0.1:20211` (só esta máquina) e sem senha.
+Abra `http://127.0.0.1:20211`.
 
-O container usa `network_mode: host` porque ARP precisa da interface real.
-Se o host tiver firewall, libere a porta:
+Para ver de outro aparelho da LAN, sem senha, liste a sub-rede em
+`OMANET_ALLOW`:
 
 ```bash
-sudo ufw allow 20211/tcp
+export BIND=0.0.0.0
+export OMANET_ALLOW=192.168.5.0/24
+docker compose up -d --build
 ```
+
+Quem chega de dentro dessa faixa usa o dashboard direto; qualquer outro IP
+(Tailscale, VPN, WAN) recebe **403**. O container usa `network_mode: host`
+porque ARP precisa da interface real, então o gate por IP do cliente é a
+barreira.
+
+## Segurança
+
+- Sem `OMANET_TOKEN` e sem `OMANET_ALLOW`, o app só escuta em loopback.
+- `OMANET_ALLOW` aceita uma lista de CIDRs (separadas por vírgula). O IP do
+  cliente é checado antes de qualquer rota; loopback é sempre permitido.
+- `OMANET_TOKEN`, quando definido, mantém o HTTP Basic (senha = token,
+  comparada com `hmac.compare_digest`) por cima do gate de rede.
+- O banco guarda inventário de MAC/IP da rede: trate `data/omanet.db` como
+  dado sensível e não commite.
+- Não libere a porta no firewall além do necessário; prefira tailnet/VPN.
 
 ## Configuração
 
 | Variável | Padrão | O que faz |
 |---|---|---|
 | `PORT` | `20211` | porta do dashboard e da API |
+| `BIND` | `127.0.0.1` | endereço de escuta; fora do loopback exige `OMANET_ALLOW` ou `OMANET_TOKEN` |
+| `OMANET_ALLOW` | vazio | CIDRs da LAN autorizados sem senha (ex.: `192.168.5.0/24`); demais IPs levam 403 |
+| `OMANET_TOKEN` | vazio | senha opcional do HTTP Basic; vazio = sem senha |
 | `IFACE` | detecta via `ip route` | interface do scan (ex.: `enp6s0`, `eth0`) |
 | `SCAN_INTERVAL` | `60` | segundos entre sweeps |
 | `DB_PATH` | `/data/omanet.db` | caminho do SQLite dentro do container |
