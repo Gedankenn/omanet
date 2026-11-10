@@ -13,6 +13,7 @@ services:
       PORT: ${PORT:-20211}
       BIND: ${BIND:-127.0.0.1}
       OMANET_TOKEN: ${OMANET_TOKEN:-}
+      OMANET_ALLOW: ${OMANET_ALLOW:-}
       IFACE: ${IFACE:-}
       SCAN_INTERVAL: ${SCAN_INTERVAL:-60}
       TZ: ${TZ:-America/Sao_Paulo}

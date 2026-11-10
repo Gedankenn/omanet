@@ -7,6 +7,7 @@ devices and presence sessions in SQLite, serves the dashboard + JSON API.
 
 import base64
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -21,6 +22,15 @@ DB_PATH = os.environ.get("DB_PATH", "/data/omanet.db")
 PORT = int(os.environ.get("PORT", "20211"))
 BIND = os.environ.get("BIND", "127.0.0.1")
 TOKEN = os.environ.get("OMANET_TOKEN", "").strip()
+# LAN-only gate: comma-separated CIDRs allowed to use the app without a token.
+# Anything outside them gets 403, including Tailscale/VPN and WAN clients.
+ALLOW = os.environ.get("OMANET_ALLOW", "").strip()
+NETS = []
+for _cidr in filter(None, (x.strip() for x in ALLOW.split(","))):
+    try:
+        NETS.append(ipaddress.ip_network(_cidr, strict=False))
+    except ValueError:
+        raise SystemExit(f"OMANET_ALLOW invalido: {_cidr!r}")
 IFACE = os.environ.get("IFACE", "")
 SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "60"))
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -299,6 +309,25 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    def client_allowed(self):
+        if not NETS:
+            return True
+        try:
+            addr = ipaddress.ip_address(self.client_address[0])
+        except ValueError:
+            return False
+        if addr.is_loopback:
+            return True
+        return any(addr in net for net in NETS)
+
+    def deny_offlan(self):
+        body = b"fora da LAN\n"
+        self.send_response(403)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def authorized(self):
         if not TOKEN:
             return True
@@ -334,6 +363,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if not self.client_allowed():
+            self.deny_offlan()
+            return
         if not self.require_auth():
             return
         path = urlparse(self.path).path
@@ -356,6 +388,9 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if not self.client_allowed():
+            self.deny_offlan()
+            return
         if not self.require_auth():
             return
         path = urlparse(self.path).path
@@ -384,15 +419,17 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    if not TOKEN and BIND not in ("127.0.0.1", "::1", "localhost"):
+    loopback = BIND in ("127.0.0.1", "::1", "localhost")
+    if not TOKEN and not loopback and not NETS:
         raise SystemExit(
-            f"recusando escutar em {BIND}:{PORT} sem OMANET_TOKEN; "
-            "defina BIND=127.0.0.1 ou um token")
+            f"recusando escutar em {BIND}:{PORT} sem OMANET_TOKEN e sem OMANET_ALLOW; "
+            "defina BIND=127.0.0.1, um OMANET_ALLOW com a sub-rede da LAN, ou um token")
     init_db()
     threading.Thread(target=scan_loop, daemon=True).start()
     server = ThreadingHTTPServer((BIND, PORT), Handler)
-    auth = "on" if TOKEN else "off (loopback only)"
-    print(f"omanet on {BIND}:{PORT}, db {DB_PATH}, auth {auth}", flush=True)
+    auth = "on" if TOKEN else "off"
+    gate = f"LAN only {ALLOW}" if NETS else "sem gate de rede"
+    print(f"omanet on {BIND}:{PORT}, db {DB_PATH}, auth {auth}, {gate}", flush=True)
     server.serve_forever()
 
 
