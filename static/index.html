@@ -50,6 +50,7 @@
             letter-spacing: -1.5px; font-variant-numeric: tabular-nums; color: var(--hy-ink); }
   .stat.lime b { color: var(--hy-lime); }
   .stat.mag b { color: var(--hy-magenta); }
+  .stat.cy b { color: var(--hy-cyan); }
   .stat.amber b { color: var(--hy-amber); }
   .stat span { font-size: 9px; letter-spacing: .9px; text-transform: uppercase; color: var(--hy-dim); }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
@@ -86,6 +87,7 @@
   }
   .chip.online { color: var(--hy-lime); border-color: color-mix(in srgb, var(--hy-lime) 40%, transparent); }
   .chip.off { color: var(--hy-mute); }
+  .chip.warn { color: var(--hy-amber); border-color: color-mix(in srgb, var(--hy-amber) 40%, transparent); }
 
   .ip { margin: 10px 0 2px; font-family: var(--hy-sans); font-size: 22px; font-weight: 600;
         line-height: 1.15; letter-spacing: .01em; font-variant-numeric: tabular-nums; color: var(--hy-ink); }
@@ -170,8 +172,8 @@
   <main>
     <div class="stats">
       <div class="stat hy-card hy-card--lime lime"><b id="sOnline">0</b><span>ONLINE AGORA</span></div>
-      <div class="stat hy-card hy-card--cyan"><b id="sKnown">0</b><span>DISPOSITIVOS CONHECIDOS</span></div>
-      <div class="stat hy-card hy-card--magenta mag"><b id="sSessions">0</b><span>SESSÕES 24H</span></div>
+      <div class="stat hy-card"><b id="sKnown">0</b><span>ENDEREÇOS CONHECIDOS</span></div>
+      <div class="stat hy-card hy-card--cyan cy"><b id="sSessions">0</b><span>SESSÕES 24H</span></div>
       <div class="stat hy-card hy-card--amber amber"><b id="sNew">0</b><span>NOVOS 24H</span></div>
     </div>
 
@@ -201,7 +203,8 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  let state = null, fetchedAt = 0, currentMac = null, drawerData = null;
+  let state = null, fetchedAt = 0, currentMac = null, currentKey = null, drawerData = null;
+  let groupsByKey = new Map();
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const pad = (n) => n < 10 ? "0" + n : "" + n;
@@ -249,58 +252,108 @@
       fetchedAt = Date.now();
       render();
       liveTimers();
-      if (currentMac) openDrawer(currentMac, true);
+      if (currentKey) openDrawer(currentKey, true);
     } catch (e) {
       $("ticker").textContent = "LINK PERDIDO — tentando novamente";
     }
   }
 
+  /* One row per address. A phone that rotates its MAC leaves several device
+     records on the same IP; showing four cards for 192.168.5.129 reads as
+     broken. Group by IP, keep the online / most recent record as the face of
+     the group, sum its presence and flag the extra MACs. */
+  function groupByIp(devices) {
+    const map = new Map();
+    for (const d of devices) {
+      const key = d.ip || d.mac;
+      let g = map.get(key);
+      if (!g) {
+        g = { key, ip: d.ip || "", macs: [], online: false, onlineCount: 0,
+              total_24h: 0, sessions_24h: 0, current_session: 0,
+              timeline: (d.timeline || []).slice(), name: "", vendor: "",
+              best: d, bestScore: -1 };
+        map.set(key, g);
+      }
+      g.macs.push(d.mac);
+      if (!g.name && d.name) g.name = d.name;
+      if (!g.vendor && d.vendor) g.vendor = d.vendor;
+      if (d.online) { g.online = true; g.onlineCount++; }
+      g.total_24h = Math.min(86400, g.total_24h + (d.total_24h || 0));
+      g.sessions_24h += d.sessions_24h || 0;
+      g.current_session = Math.max(g.current_session, d.current_session || 0);
+      if (d.timeline) g.timeline = g.timeline.map((v, i) => Math.max(v, d.timeline[i] || 0));
+      const score = (d.online ? 1e12 : 0) + (d.last_seen || 0);
+      if (score > g.bestScore) { g.bestScore = score; g.best = d; }
+    }
+    for (const g of map.values()) {
+      g.mac = g.best.mac;
+      g.display = disp({ ...g.best, name: g.name, vendor: g.vendor });
+      g.vend = vend({ ...g.best, vendor: g.vendor });
+      g.score = (g.online ? 1e12 : 0) + (g.best.last_seen || 0);
+    }
+    return [...map.values()].sort((a, b) =>
+      (b.online - a.online) || (b.total_24h - a.total_24h) || (b.score - a.score));
+  }
+
   function render() {
     const s = state.stats;
     $("sOnline").textContent = s.online;
-    $("sKnown").textContent = s.known;
     $("sSessions").textContent = s.sessions_24h;
     $("sNew").textContent = s.new_24h;
     $("ticker").textContent = `LAN 192.168.5.0/24 · ${s.online} ONLINE · SWEEP ${state.interval}S`;
 
+    const groups = groupByIp(state.devices);
+    groupsByKey = new Map(groups.map((g) => [g.key, g]));
+    /* the API counts MAC records; the page shows one card per address */
+    $("sKnown").textContent = groups.length;
+    $("sKnown").title = `${state.devices.length} registros de MAC em ${groups.length} endereços`;
+
     const grid = $("grid");
-    grid.innerHTML = state.devices.map((d) => {
-      const pct = Math.min(100, Math.round(d.total_24h / 86400 * 100));
-      return `<button class="card hy-card ${d.online ? "hy-card--lime" : ""} ${d.online ? "" : "off"}" data-mac="${esc(d.mac)}" type="button">
-        <div class="crow"><span class="dot ${d.online ? "on" : ""}"></span>
-          <span class="name">${esc(disp(d))}</span>
-          <span class="chip ${d.online ? "online" : "off"}">${d.online ? "ONLINE" : "OFFLINE"}</span></div>
-        <div class="ip">${esc(d.ip || "—")}</div>
-        <div class="vendor">${esc(vend(d))}</div>
+    grid.innerHTML = groups.map((g) => {
+      const pct = Math.min(100, Math.round(g.total_24h / 86400 * 100));
+      const extra = g.macs.length > 1
+        ? `<span class="chip ${g.onlineCount > 1 ? "warn" : ""}" title="${esc(g.macs.join(" · "))}">${g.macs.length} MACs</span>`
+        : "";
+      return `<button class="card hy-card ${g.online ? "hy-card--lime" : ""} ${g.online ? "" : "off"}" data-key="${esc(g.key)}" type="button">
+        <div class="crow"><span class="dot ${g.online ? "on" : ""}"></span>
+          <span class="name">${esc(g.display)}</span>
+          ${extra}
+          <span class="chip ${g.online ? "online" : "off"}">${g.online ? "ONLINE" : "OFFLINE"}</span></div>
+        <div class="ip">${esc(g.ip || "—")}</div>
+        <div class="vendor">${esc(g.vend)}</div>
         <div class="metrics">
-          <div><b>AGORA</b><span data-cur="${d.current_session}">${d.current_session ? hms(d.current_session) : "—"}</span></div>
-          <div><b>24H</b><span>${dur(d.total_24h)}</span></div>
-          <div><b>SESSÕES</b><span>${d.sessions_24h}</span></div>
+          <div><b>AGORA</b><span data-cur="${g.current_session}">${g.current_session ? hms(g.current_session) : "—"}</span></div>
+          <div><b>24H</b><span>${dur(g.total_24h)}</span></div>
+          <div><b>SESSÕES</b><span>${g.sessions_24h}</span></div>
         </div>
-        <div class="hy-gauge ${d.online ? "hy-gauge--lime" : ""}"><i style="width:${pct}%"></i></div>
-        <div class="foot"><span>MAC ${esc(d.mac)}</span><span>${pct}% ONLINE</span></div>
+        <div class="hy-gauge ${g.online ? "hy-gauge--lime" : ""}"><i style="width:${pct}%"></i></div>
+        <div class="foot"><span>${g.macs.length > 1 ? `${g.macs.length} MACs · ${esc(g.mac.slice(-5))}` : `MAC ${esc(g.mac)}`}</span><span>${pct}% ONLINE</span></div>
       </button>`;
     }).join("") || `<div class="empty">NENHUM DISPOSITIVO AINDA — PRIMEIRO SWEEP EM ANDAMENTO</div>`;
 
     const tl = $("timeline");
-    tl.innerHTML = state.devices.map((d) => {
-      const cells = d.timeline.map((v, i) => {
+    tl.innerHTML = groups.map((g) => {
+      const cells = g.timeline.map((v, i) => {
         const t0 = new Date((state.now - 86400 + i * 900) * 1000);
         const t1 = new Date((state.now - 86400 + (i + 1) * 900) * 1000);
         const label = `${clockStr(t0.getTime() / 1000)}–${clockStr(t1.getTime() / 1000)} · ${Math.round(v * 100)}%`;
         const bg = v <= 0 ? "" : ` style="background:rgba(34,232,255,${(0.12 + v * 0.46).toFixed(2)});border-color:rgba(34,232,255,${(0.18 + v * 0.42).toFixed(2)})"`;
         return `<i${bg} title="${label}"></i>`;
       }).join("");
-      return `<div class="trow"><div class="tname">${esc(disp(d))}</div>
-        <div class="cells">${cells}</div><div class="ttot">${dur(d.total_24h)}</div></div>`;
+      return `<div class="trow"><div class="tname">${esc(g.display)}</div>
+        <div class="cells">${cells}</div><div class="ttot">${dur(g.total_24h)}</div></div>`;
     }).join("") || `<div class="empty">SEM HISTÓRICO NAS ÚLTIMAS 24H</div>`;
   }
 
-  async function openDrawer(mac, silent) {
+  async function openDrawer(key, silent) {
+    const group = groupsByKey.get(key) || null;
+    const mac = group ? group.mac : key;
+    currentKey = key;
     currentMac = mac;
     const r = await fetch(`/api/device?mac=${encodeURIComponent(mac)}`, { cache: "no-store" });
     if (!r.ok) return;
     const d = await r.json();
+    if (!d || !d.mac) return;
     drawerData = d;
     $("dName").textContent = disp(d);
     $("dInput").value = d.name || "";
@@ -314,7 +367,11 @@
       <dt>primeiro seen</dt><dd>${new Date(d.first_seen * 1000).toLocaleString("pt-BR")}</dd>
       <dt>último seen</dt><dd>${new Date(d.last_seen * 1000).toLocaleString("pt-BR")}</dd>
       <dt>agora</dt><dd>${onlineNow}</dd>
-      <dt>total histórico</dt><dd>${dur(d.total_seconds)}</dd>`;
+      <dt>total histórico</dt><dd>${dur(d.total_seconds)}</dd>` +
+      (group && group.macs.length > 1
+        ? `<dt>macs (${group.macs.length})</dt><dd>${group.macs.map((m) => esc(m)).join("<br>")}</dd>
+           <dt>detalhe</dt><dd>sessões do MAC mais recente</dd>`
+        : "");
     $("dSessions").innerHTML = `<div class="srow"><b>INÍCIO</b><b>FIM</b><b>DURAÇÃO</b></div>` +
       d.sessions.map((s) => {
         const end = s.end ?? Math.floor(Date.now() / 1000);
@@ -330,13 +387,14 @@
 
   function closeDrawer() {
     currentMac = null;
+    currentKey = null;
     $("shade").classList.remove("open");
     $("drawer").classList.remove("open");
   }
 
   $("grid").addEventListener("click", (e) => {
     const card = e.target.closest(".card");
-    if (card) openDrawer(card.dataset.mac);
+    if (card) openDrawer(card.dataset.key);
   });
   $("dClose").addEventListener("click", closeDrawer);
   $("shade").addEventListener("click", closeDrawer);
