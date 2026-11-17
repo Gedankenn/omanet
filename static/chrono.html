@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>OMA // CHRONO — linha do tempo da LAN</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<style>
+@font-face{font-family:Chakra;src:url("/fonts/chakra.woff2") format("woff2");font-weight:600 700;font-display:swap}
+@font-face{font-family:JBM;src:url("/fonts/jetbrains-mono.woff2") format("woff2");font-weight:400 700;font-display:swap}
+:root{
+  --bg:#06070C; --sunken:#0A0C14; --panel:#0B0F18; --line:#1B2433; --line-hi:#2C3A50;
+  --ink:#DDF6FF; --dim:#A9BCD2; --mute:#8496AC;
+  --cyan:#22E8FF; --magenta:#FF2E88; --lime:#9CFF4A; --amber:#FFC24A; --red:#FF4D5E; --violet:#8A6BFF;
+  --disp:"Chakra",system-ui,sans-serif; --mono:"JBM",ui-monospace,monospace; --r:10px; --r-sm:6px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:400 12.5px/1.5 var(--mono)}
+body{display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;opacity:.22;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.45) 2px 3px)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:8;
+  background:radial-gradient(60% 55% at 50% 42%,rgba(34,232,255,.07),transparent 70%),
+             radial-gradient(50% 45% at 92% 92%,rgba(255,46,136,.06),transparent 70%)}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+header{position:relative;z-index:20;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 92%,transparent)}
+.top{display:flex;align-items:center;gap:14px;padding:9px 16px}
+.mark{font:700 9px/1 var(--mono);letter-spacing:1.6px;color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 40%,transparent);
+  border-radius:var(--r-sm);background:color-mix(in srgb,var(--cyan) 8%,transparent);padding:9px 8px}
+.brand{font:700 18px/1 var(--disp);letter-spacing:.1em}
+.brand b{color:var(--magenta)}
+.brand span{display:block;font:400 9px/1.6 var(--mono);letter-spacing:1.5px;color:var(--mute);margin-top:3px}
+.hud{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-hi);border-radius:var(--r-sm);
+  background:var(--sunken);padding:7px 9px;font:400 10px/1 var(--mono);letter-spacing:.8px;color:var(--dim)}
+.chip b{font:700 12px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.chip.live{border-color:color-mix(in srgb,var(--lime) 45%,transparent);color:var(--lime)}
+.chip.live i{width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);animation:pulse 2.4s ease-in-out infinite}
+.chip.time{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 40%,transparent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;padding:12px 16px 0}
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:var(--r);background:
+  radial-gradient(120% 120% at 50% 40%,#080b14,#05060a 70%);overflow:hidden;cursor:grab}
+.stage.drag{cursor:grabbing}
+canvas{display:block;width:100%;height:100%}
+.legend{position:absolute;left:12px;bottom:10px;display:flex;gap:12px;flex-wrap:wrap;font:400 9.5px/1 var(--mono);
+  letter-spacing:.9px;color:var(--mute);pointer-events:none}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.hint{position:absolute;right:12px;bottom:10px;font:400 9.5px/1 var(--mono);letter-spacing:.9px;color:var(--mute);pointer-events:none}
+.tip{position:absolute;z-index:5;pointer-events:none;transform:translate(-50%,-140%);
+  background:#0B0F18F2;border:1px solid var(--line-hi);border-radius:var(--r-sm);padding:6px 8px;
+  font:400 10.5px/1.45 var(--mono);color:var(--ink);white-space:nowrap;opacity:0;transition:opacity .12s}
+.tip b{color:var(--cyan)}
+
+aside{min-height:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.card{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:11px 12px}
+.card h2{margin:0 0 8px;font:700 9.5px/1 var(--mono);letter-spacing:1.5px;color:var(--mute);text-transform:uppercase}
+.card h2 b{color:var(--cyan)}
+.kpi{display:flex;align-items:baseline;gap:8px;font:700 26px/1 var(--disp);font-variant-numeric:tabular-nums}
+.kpi small{font:400 9.5px/1.3 var(--mono);letter-spacing:.6px;color:var(--mute)}
+.kpi.cy{color:var(--cyan)} .kpi.lim{color:var(--lime)} .kpi.mag{color:var(--magenta)} .kpi.amb{color:var(--amber)}
+.rows{display:grid;gap:7px}
+.row{display:flex;justify-content:space-between;gap:8px;font:400 10.5px/1.3 var(--mono);color:var(--dim)}
+.row b{color:var(--ink);font-weight:700}
+.det{overflow-y:auto}
+.det .ip{font:700 15px/1.2 var(--mono);color:var(--cyan)}
+.det .who{font:400 11px/1.45 var(--mono);color:var(--dim);margin:4px 0 8px}
+.tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.tag{border:1px solid var(--line-hi);border-radius:4px;padding:3px 6px;font:400 9px/1 var(--mono);letter-spacing:.6px;color:var(--dim)}
+.tag.p{border-color:color-mix(in srgb,var(--amber) 45%,transparent);color:var(--amber)}
+.sess{display:grid;gap:4px;font:400 10px/1.35 var(--mono);color:var(--dim);max-height:140px;overflow:auto}
+.sess div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed #141b28;padding-bottom:3px}
+.tick{display:grid;gap:5px;font:400 10px/1.35 var(--mono);color:var(--dim);overflow:hidden}
+.tick div{display:flex;gap:7px;align-items:baseline}
+.tick .h{color:var(--mute);font-variant-numeric:tabular-nums}
+.tick .ip{color:var(--ink)}
+.badge{margin-left:auto;font:700 8.5px/1 var(--mono);letter-spacing:.8px;border-radius:4px;padding:3px 5px;
+  border:1px solid currentColor}
+.badge.in{color:var(--lime)} .badge.out{color:var(--red)}
+
+.timeline{border-top:1px solid var(--line);margin-top:12px;background:var(--sunken)}
+.tlwrap{position:relative;height:220px;padding:4px 16px 0;display:flex;flex-direction:column}
+#axis{width:100%;height:20px;flex:none}
+.tlscroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2C3A50 transparent}
+#gantt{width:100%;display:block;cursor:crosshair}
+.tlbar{display:flex;align-items:center;gap:10px;padding:6px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.tlbar .sp{flex:1}
+.btn{min-height:34px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--line-hi);background:var(--panel);
+  color:var(--dim);font:700 9.5px/1 var(--mono);letter-spacing:1.2px;text-transform:uppercase}
+.btn:hover{color:var(--ink);border-color:var(--cyan)}
+.btn.on{border-color:color-mix(in srgb,var(--lime) 55%,transparent);background:color-mix(in srgb,var(--lime) 12%,transparent);color:var(--lime)}
+.btn.play{border-color:color-mix(in srgb,var(--magenta) 50%,transparent);color:var(--magenta)}
+.pill{font:400 9.5px/1 var(--mono);letter-spacing:1px;color:var(--mute)}
+@media(prefers-reduced-motion:reduce){.chip.live i{animation:none}}
+@media(max-width:980px){
+  main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  aside{flex-direction:row;overflow-x:auto;padding-bottom:2px}
+  aside .card{min-width:250px}
+  .tlwrap{height:150px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <span class="mark">OMA</span>
+    <div class="brand">NET <b>//</b> CHRONO<span>linha do tempo da LAN · 24 h</span></div>
+    <div class="hud">
+      <span class="chip live"><i></i>AO VIVO <b id="liveCount">—</b></span>
+      <span class="chip time" id="tChip">—</span>
+      <span class="chip">PORTAS <b id="portCount">—</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="stage" id="stage" aria-label="órbita da LAN no instante escolhido">
+    <canvas id="orbit"></canvas>
+    <div class="legend">
+      <span><i style="background:#22E8FF"></i>presente</span>
+      <span><i style="background:#FF2E88"></i>novo 24 h</span>
+      <span><i style="background:#8496AC"></i>fora</span>
+      <span><i style="background:#FFC24A"></i>porta aberta = lua</span>
+    </div>
+    <div class="hint">arraste para girar · clique no nó para detalhar</div>
+    <div class="tip" id="tip"></div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>instante <b id="tLabel">agora</b></h2>
+      <div class="kpi cy"><span id="kPresent">—</span><small>presentes</small></div>
+      <div class="rows" style="margin-top:9px">
+        <div class="row"><span>endereços no /24</span><b id="kIps">—</b></div>
+        <div class="row"><span>portas abertas</span><b id="kPorts">—</b></div>
+        <div class="row"><span>sessões na janela</span><b id="kSess">—</b></div>
+        <div class="row"><span>primeiro registro</span><b id="kSince">—</b></div>
+      </div>
+    </div>
+    <div class="card det" id="detCard">
+      <h2>dispositivo <b id="detIp">—</b></h2>
+      <div class="who" id="detWho">clique num nó da órbita</div>
+      <div class="tags" id="detTags"></div>
+      <div class="sess" id="detSess"></div>
+    </div>
+    <div class="card" style="min-height:0;display:flex;flex-direction:column;gap:6px">
+      <h2>eventos <b>entradas e saídas</b></h2>
+      <div class="tick" id="tick"></div>
+    </div>
+  </aside>
+</main>
+
+<div class="timeline">
+  <div class="tlwrap">
+    <canvas id="axis" aria-hidden="true"></canvas>
+    <div class="tlscroll" id="tlscroll"><canvas id="gantt" aria-label="mapa de presença por endereço ao longo de 24 horas"></canvas></div>
+  </div>
+  <div class="tlbar">
+    <button class="btn play" id="playBtn" type="button">▶ REPLAY</button>
+    <button class="btn" id="liveBtn" type="button">AO VIVO</button>
+    <span class="sp"></span>
+    <span class="pill">velocidade</span>
+    <button class="btn" data-speed="60" type="button">1 MIN/S</button>
+    <button class="btn on" data-speed="300" type="button">5 MIN/S</button>
+    <button class="btn" data-speed="900" type="button">15 MIN/S</button>
+    <span class="sp"></span>
+    <span class="pill">← → 1 min · shift 10 min · espaço play · home/end</span>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const COL = {ink:"#DDF6FF", dim:"#A9BCD2", mute:"#8496AC", line:"#1B2433",
+  cyan:"#22E8FF", magenta:"#FF2E88", lime:"#9CFF4A", amber:"#FFC24A", red:"#FF4D5E", violet:"#8A6BFF"};
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let state=null, presence=null, events=[];
+let IP={}, order=[], T0=0, T1=0, T=0, playing=false, speed=300, sel=null, hoverRow=-1;
+let rot=0, lastFrame=0, dragging=false, stageAngle=0, stageDrag=null;
+const stage=$("#stage"), orbit=$("#orbit"), octx=orbit.getContext("2d");
+const gantt=$("#gantt"), gctx=gantt.getContext("2d");
+const tip=$("#tip");
+
+/* ---------- dados ---------- */
+async function load(){
+  const [s, p, e] = await Promise.all([
+    fetch("/api/state",{cache:"no-store"}).then(r=>r.json()),
+    fetch("/api/presence?hours=24",{cache:"no-store"}).then(r=>r.json()).catch(()=>null),
+    fetch("/api/events?limit=200",{cache:"no-store"}).then(r=>r.json()).catch(()=>null)
+  ]);
+  state=s; presence=p; events=(e&&e.events)||[];
+  build();
+  renderStatic();
+}
+
+function build(){
+  const now = state.now;
+  const portMap = state.ports || {};
+  IP = {};
+  for(const d of state.devices){
+    const ip = d.ip || "sem ip";
+    if(!IP[ip]){
+      const raw = portMap[ip];
+      const ports = Array.isArray(raw)
+        ? raw.map(p => (typeof p === "number" ? {port:p, name:""} : p))
+        : ((raw && raw.ports) || []);
+      IP[ip] = {ip, macs:[], ports, sessions:[]};
+    }
+    IP[ip].macs.push(d);
+  }
+  const byMac = (presence && presence.devices) || {};
+  for(const ip in IP){
+    const o = IP[ip], iv=[];
+    for(const m of o.macs) for(const s of (byMac[m.mac]||[])) iv.push([s[0], (s[1]||now), s[2]]);
+    iv.sort((a,b)=>a[0]-b[0]);
+    const merged=[];
+    for(const [a,b] of iv){
+      const last = merged[merged.length-1];
+      if(last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
+      else merged.push([a,b]);
+    }
+    o.sessions = merged;
+    o.first = merged.length ? merged[0][0] : now;
+    o.last  = merged.length ? merged[merged.length-1][1] : now;
+    o.macs.sort((a,b)=>(b.online?1:0)-(a.online?1:0));
+    const oct = parseInt((ip.split(".")[3]||"0"),10) || 0;
+    o.oct = oct;
+    o.tier = oct % 3;
+    o.angle = (oct/256)*Math.PI*2 - Math.PI/2;
+    o.name = (o.macs.find(m=>m.name)||{}).name || "";
+    o.vendor = (o.macs.find(m=>m.vendor && !/unknown/i.test(m.vendor))||{}).vendor || "";
+    o.isNew = o.macs.some(m=>now - m.first_seen < 86400);
+  }
+  order = Object.values(IP).sort((a,b)=>a.first-b.first || a.ip.localeCompare(b.ip));
+  T0 = presence ? presence.since : now-86400;
+  T1 = presence ? presence.now : now;
+  if(!(T>=T0 && T<=T1)) T = T1;
+}
+
+const active = (o,t)=>o.sessions.some(([a,b])=> t>=a && t<=b);
+const totalPorts = ()=>Object.values(IP).reduce((a,o)=>a+o.ports.length,0);
+const presentAt = (t)=>order.filter(o=>active(o,t)).length;
+
+/* ---------- util ---------- */
+const pad=n=>String(n).padStart(2,"0");
+function hhmm(ts){ const d=new Date(ts*1000); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+function hhmmss(ts){ const d=new Date(ts*1000); return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); }
+function dayRef(ts){ const d=new Date(ts*1000), n=new Date(); return d.toDateString()===n.toDateString() ? "" : "ontem "; }
+function dur(sec){ sec=Math.max(0,Math.round(sec)); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60);
+  return h ? h+"h "+pad(m)+"m" : m+"m "+pad(sec%60)+"s"; }
+function portColor(p){
+  if(p===22) return COL.lime;
+  if(p===80||p===443||p===8443) return COL.cyan;
+  if(p===445||p===5000||p===5001||p===9100) return COL.amber;
+  if(p===554) return COL.magenta;
+  if(p===1883||p===32400) return COL.violet;
+  return COL.dim;
+}
+function fit(c){ const dpr=Math.min(2,devicePixelRatio||1); const r=c.getBoundingClientRect();
+  if(c.width!==Math.round(r.width*dpr)||c.height!==Math.round(r.height*dpr)){
+    c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr); }
+  const ctx=c.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {w:r.width,h:r.height,ctx}; }
+
+/* ---------- órbita ---------- */
+function drawOrbit(ts){
+  const {w,h,ctx}=fit(orbit);
+  ctx.clearRect(0,0,w,h);
+  const coreIp = order.find(o=>o.oct===1) || null;
+  const cx=w/2, cy=h/2+6, R=Math.min(w*0.42,h*0.46);
+  const rings=[0.42,0.66,0.9].map(k=>R*k);
+
+  // anéis + graduação do /24
+  ctx.save();
+  for(let i=0;i<rings.length;i++){
+    ctx.beginPath(); ctx.arc(cx,cy,rings[i],0,Math.PI*2);
+    ctx.strokeStyle = i===1 ? "rgba(138,107,255,.20)" : "rgba(34,232,255,.13)";
+    ctx.lineWidth=1; ctx.stroke();
+  }
+  for(let k=0;k<32;k++){
+    const a=stageAngle + k/32*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*(rings[2]+4), cy+Math.sin(a)*(rings[2]+4));
+    ctx.lineTo(cx+Math.cos(a)*(rings[2]+10), cy+Math.sin(a)*(rings[2]+10));
+    ctx.strokeStyle="rgba(34,232,255,.20)"; ctx.lineWidth=1; ctx.stroke();
+  }
+  ctx.restore();
+
+  // núcleo = roteador
+  const grad=ctx.createRadialGradient(cx,cy,2,cx,cy,54);
+  grad.addColorStop(0,"rgba(34,232,255,.20)"); grad.addColorStop(1,"rgba(34,232,255,0)");
+  ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(cx,cy,54,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,30,0,Math.PI*2);
+  ctx.fillStyle="rgba(34,232,255,.10)"; ctx.fill();
+  ctx.strokeStyle="rgba(34,232,255,.55)"; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle=COL.ink; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.font="700 9px JBM, monospace"; ctx.fillText("ROTEADOR",cx,cy-7);
+  ctx.font="700 15px JBM, monospace"; ctx.fillStyle=COL.cyan;
+  ctx.fillText(coreIp ? "."+coreIp.oct : "?",cx,cy+7);
+  ctx.font="400 8px JBM, monospace"; ctx.fillStyle=COL.mute;
+  ctx.fillText(coreIp ? (coreIp.vendor||coreIp.ip).slice(0,22) : "gateway desconhecido",cx,cy+22);
+
+  // nós
+  const labels=[];
+  ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+  for(const o of order){
+    const rc = rings[o.tier];
+    const a = o.angle + stageAngle + rot*(0.10+o.tier*0.04);
+    const x = cx+Math.cos(a)*rc, y = cy+Math.sin(a)*rc;
+    o._x=x; o._y=y;
+    const on = active(o,ts);
+    const isSel = sel && sel.ip===o.ip;
+    const isHov = hoverRow>=0 && order[hoverRow] && order[hoverRow].ip===o.ip;
+    // halo quando presente
+    if(on){
+      const g=ctx.createRadialGradient(x,y,0,x,y,18);
+      g.addColorStop(0, o.isNew ? "rgba(255,46,136,.35)" : "rgba(34,232,255,.28)");
+      g.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,18,0,Math.PI*2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(x,y,on?8.5:6,0,Math.PI*2);
+    ctx.fillStyle = on ? (o.isNew?"#FF2E88":"#22E8FF") : "#0A0C14";
+    ctx.fill();
+    ctx.lineWidth = on?1.6:1;
+    ctx.strokeStyle = on ? (o.isNew?"#FFB3D2":"#9CF3FF") : "#2C3A50";
+    ctx.stroke();
+    if(on && !reduce){
+      const chegou = o.sessions.some(([a])=> T>=a && T-a < 180);
+      if(chegou){
+        ctx.beginPath(); ctx.arc(x,y,13.5,0,Math.PI*2);
+        ctx.strokeStyle="rgba(156,255,74,.75)"; ctx.lineWidth=1.4; ctx.stroke();
+      }
+    }
+    if(!on){
+      const saiu = o.sessions.some(([,b])=> T-b >= 0 && T-b < 180);
+      if(saiu){
+        ctx.beginPath(); ctx.arc(x,y,12,0,Math.PI*2);
+        ctx.setLineDash([2,3]); ctx.strokeStyle="rgba(255,77,94,.7)";
+        ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    if(isSel || isHov){
+      ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2);
+      ctx.strokeStyle=COL.amber; ctx.lineWidth=1.2; ctx.stroke();
+    }
+    // luas = portas abertas (só de quem está presente no instante)
+    if(on && o.ports.length){
+      o.ports.forEach((p,i)=>{
+        const ma = rot*(1.6+i*0.12) + i*(Math.PI*2/Math.max(1,o.ports.length)) + o.oct;
+        const mr = 16 + (i%2)*4;
+        const mx = x+Math.cos(ma)*mr, my = y+Math.sin(ma)*mr;
+        ctx.beginPath(); ctx.arc(mx,my,2.6,0,Math.PI*2);
+        ctx.fillStyle=portColor(p.port); ctx.fill();
+        if(isSel){
+          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(mx,my);
+          ctx.strokeStyle="rgba(255,194,74,.28)"; ctx.lineWidth=1; ctx.stroke();
+        }
+      });
+    }
+    labels.push({x:x+11, y:y+3, on,
+      text: "."+o.oct + (o.macs.length>1 ? "×"+o.macs.length : "")});
+  }
+  // rótulos: presentes primeiro, sem encavalar
+  labels.sort((a,b)=>(b.on?1:0)-(a.on?1:0));
+  const postos=[];
+  for(const l of labels){
+    if(postos.some(p => Math.abs(p.y-l.y) < 9 && Math.abs(p.x-l.x) < 26)) continue;
+    postos.push(l);
+    ctx.font=(l.on?"700 ":"400 ")+"9.5px JBM, monospace";
+    ctx.fillStyle=l.on ? COL.ink : "#5E6E86";
+    ctx.fillText(l.text, l.x, l.y);
+  }
+}
+
+/* ---------- mapa de presença ---------- */
+const ROW=15, PADL=94, PADR=16, TOPS=4;
+const axisEl=$("#axis");
+function xspan(w){ return {left:PADL, right:w-PADR, width:Math.max(10,w-PADL-PADR)}; }
+function xOf(t,w){ const s=xspan(w); const f=(Math.max(T0,Math.min(T1,t))-T0)/Math.max(1,(T1-T0)); return s.left+f*s.width; }
+
+function drawAxis(){
+  const {w,h,ctx}=fit(axisEl);
+  ctx.clearRect(0,0,w,h);
+  const s=xspan(w);
+  for(let k=0;k<=4;k++){
+    const ts=T0+(T1-T0)*k/4, x=xOf(ts,w);
+    ctx.beginPath(); ctx.moveTo(x,2); ctx.lineTo(x,h-2);
+    ctx.strokeStyle = k===4 ? "rgba(255,46,136,.45)" : "rgba(44,58,80,.9)";
+    ctx.lineWidth=1; ctx.stroke();
+    ctx.font="400 9px JBM, monospace"; ctx.fillStyle=COL.mute;
+    ctx.textAlign = k===4 ? "right" : (k===0 ? "left" : "center");
+    ctx.textBaseline="middle";
+    ctx.fillText(k===4?"agora":hhmm(ts), x, h/2);
+  }
+  const px=xOf(T,w);
+  ctx.beginPath(); ctx.arc(px,h/2,3.4,0,Math.PI*2); ctx.fillStyle=COL.amber; ctx.fill();
+}
+
+function drawGantt(){
+  const need = Math.max(60, order.length*ROW + TOPS*2);
+  if(gantt.style.height !== need+"px") gantt.style.height = need+"px";
+  const {w,h,ctx}=fit(gantt);
+  ctx.clearRect(0,0,w,h);
+  const s=xspan(w);
+
+  order.forEach((o,i)=>{
+    const y = TOPS + i*ROW;
+    if(y > h) return;
+    const isHov = i===hoverRow;
+    if(i%2===0){ ctx.fillStyle="rgba(11,15,24,.75)"; ctx.fillRect(s.left,y-1,s.width,ROW); }
+    if(isHov){ ctx.fillStyle="rgba(34,232,255,.07)"; ctx.fillRect(0,y-1,w,ROW); }
+    ctx.font="400 9.5px JBM, monospace"; ctx.textAlign="right"; ctx.textBaseline="middle";
+    ctx.fillStyle = active(o,T) ? COL.ink : "#5E6E86";
+    ctx.fillText("."+o.oct+(o.macs.length>1?"×"+o.macs.length:""), s.left-8, y+ROW/2);
+    for(const [a,b] of o.sessions){
+      const x1=xOf(a,w), x2=xOf(b,w);
+      const now = T>=a && T<=b;
+      ctx.fillStyle = now ? "rgba(34,232,255,.95)" : (b-a>3600?"rgba(34,232,255,.34)":"rgba(34,232,255,.52)");
+      ctx.fillRect(x1, y+3, Math.max(1.5,x2-x1), ROW-6);
+    }
+  });
+
+  const px=xOf(T,w);
+  ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,h);
+  ctx.strokeStyle=COL.amber; ctx.lineWidth=1.2; ctx.stroke();
+}
+
+/* ---------- UI ---------- */
+function renderStatic(){
+  const p = presentAt(T);
+  $("#kPresent").textContent = p;
+  $("#kIps").textContent = order.length;
+  $("#kPorts").textContent = totalPorts();
+  $("#kSess").textContent = order.reduce((a,o)=>a+o.sessions.length,0);
+  $("#kSince").textContent = new Date(T0*1000).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+  $("#liveCount").textContent = presentAt(T1);
+  $("#portCount").textContent = totalPorts();
+  $("#tChip").innerHTML = (T>=T1-5 ? "AGORA" : "REPLAY") + " <b>"+hhmmss(T)+"</b>";
+  $("#tLabel").textContent = T>=T1-5 ? "agora" : dayRef(T)+hhmm(T);
+  renderTicker(); renderDetail();
+}
+
+function renderTicker(){
+  const now=state?state.now:0;
+  const box=$("#tick");
+  const items = events.filter(e=>e.ts<=T).slice(0,7);
+  box.innerHTML = items.map(e=>{
+    const o = IP[e.ip]||{};
+    const who = (o.name||"").slice(0,18);
+    const badge = e.kind==="in" ? '<span class="badge in">ENTROU</span>' : '<span class="badge out">SAIU</span>';
+    return '<div><span class="h">'+hhmm(e.ts)+'</span><span class="ip">.'+(e.ip||"").split(".").pop()+'</span>'+
+           '<span>'+(who||"sem nome")+'</span>'+badge+'</div>';
+  }).join("") || '<div style="color:#8496AC">sem eventos na janela</div>';
+}
+
+function renderDetail(){
+  const d = sel;
+  $("#detIp").textContent = d ? d.ip : "—";
+  if(!d){
+    $("#detWho").textContent = "clique num nó da órbita";
+    $("#detTags").innerHTML=""; $("#detSess").innerHTML="";
+    return;
+  }
+  const v = d.vendor || "fabricante desconhecido";
+  $("#detWho").textContent = (d.name ? d.name+" · " : "") + v + " · " + d.macs.length + " registro(s) de MAC";
+  const tags=[];
+  if(active(d,T)) tags.push('<span class="tag" style="color:#9CFF4A;border-color:#9CFF4A80">PRESENTE AGORA</span>');
+  if(d.isNew) tags.push('<span class="tag" style="color:#FF2E88;border-color:#FF2E8880">NOVO 24 H</span>');
+  if(d.macs.length>1) tags.push('<span class="tag">'+d.macs.length+' MACs</span>');
+  d.ports.forEach(p=>tags.push('<span class="tag p">'+p.port+' '+p.name+'</span>'));
+  if(!d.ports.length) tags.push('<span class="tag">sem porta conhecida</span>');
+  $("#detTags").innerHTML = tags.join("");
+  $("#detSess").innerHTML = d.sessions.slice(-6).reverse().map(([a,b])=>
+    '<div><span>'+hhmm(a)+" → "+(Math.abs(b-T1)<5?"agora":hhmm(b))+'</span><span>'+dur(b-a)+'</span></div>'
+  ).join("") || '<div>sem sessão na janela</div>';
+}
+
+function setT(t, quiet){
+  T = Math.max(T0, Math.min(T1, t));
+  if(!quiet) renderStatic(); else { $("#tChip").innerHTML=(T>=T1-5?"AGORA":"REPLAY")+" <b>"+hhmmss(T)+"</b>"; $("#tLabel").textContent = T>=T1-5?"agora":dayRef(T)+hhmm(T); }
+}
+
+/* ---------- loop ---------- */
+function frame(now){
+  const dt = lastFrame ? Math.min(0.05,(now-lastFrame)/1000) : 0;
+  lastFrame = now;
+  if(playing){
+    T += dt*speed;
+    if(T>=T1){ T=T1; playing=false; paintPlay(); }
+    $("#kPresent").textContent = presentAt(T);
+    setT(T, true);
+  }
+  if(!reduce) rot += dt*(playing?1.6:0.55);
+  drawOrbit(T);
+  drawAxis();
+  drawGantt();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- interações ---------- */
+gantt.addEventListener("pointerdown", ev=>{
+  dragging=true;
+  try{ gantt.setPointerCapture(ev.pointerId); }catch(e){}
+  scrubFromEvent(ev);
+});
+gantt.addEventListener("pointermove", ev=>{
+  const r=gantt.getBoundingClientRect();
+  const x=ev.clientX-r.left, y=ev.clientY-r.top;
+  const idx=Math.floor((y-TOPS)/ROW);
+  hoverRow = (idx>=0 && idx<order.length) ? idx : -1;
+  if(dragging) scrubFromEvent(ev);
+  gantt.style.cursor = (x<PADL) ? "default" : (dragging?"grabbing":"crosshair");
+});
+gantt.addEventListener("pointerup", ()=>{ dragging=false; });
+gantt.addEventListener("pointerleave", ()=>{ hoverRow=-1; });
+function scrubFromEvent(ev){
+  const r=gantt.getBoundingClientRect();
+  const s=xspan(gantt.clientWidth);
+  const f=Math.max(0,Math.min(1,(ev.clientX-r.left-s.left)/Math.max(1,s.width)));
+  playing=false; paintPlay();
+  setT(T0 + f*(T1-T0));
+}
+gantt.addEventListener("click", ev=>{
+  const r=gantt.getBoundingClientRect();
+  const idx=Math.floor((ev.clientY-r.top-TOPS)/ROW);
+  if(idx>=0 && idx<order.length){ sel=order[idx]; renderDetail(); }
+});
+
+orbit.addEventListener("pointerdown", ev=>{
+  const r=orbit.getBoundingClientRect();
+  const x=ev.clientX-r.left, y=ev.clientY-r.top;
+  let hit=null, best=1e9;
+  for(const o of order){
+    const d=Math.hypot(x-o._x, y-o._y);
+    if(d<best && d<16){ best=d; hit=o; }
+  }
+  if(hit){ sel=hit; renderDetail(); stageDrag=null; return; }
+  stageDrag={x:ev.clientX, a:stageAngle};
+  try{ orbit.setPointerCapture(ev.pointerId); }catch(e){}
+});
+orbit.addEventListener("pointermove", ev=>{
+  if(!stageDrag) return;
+  stageAngle = stageDrag.a + (ev.clientX-stageDrag.x)/260;
+});
+orbit.addEventListener("pointerup", ()=>{ stageDrag=null; });
+orbit.addEventListener("mousemove", ev=>{
+  const r=orbit.getBoundingClientRect();
+  const x=ev.clientX-r.left, y=ev.clientY-r.top;
+  let hit=null, best=1e9;
+  for(const o of order){
+    const d=Math.hypot(x-o._x,y-o._y);
+    if(d<best && d<18){ best=d; hit=o; }
+  }
+  if(hit){
+    const pw = hit.ports.map(p=>p.port).join(" ") || "sem porta";
+    tip.innerHTML = "<b>."+hit.oct+"</b> "+(hit.name||"sem nome")+"<br>"+pw;
+    tip.style.left = x+"px"; tip.style.top = y+"px"; tip.style.opacity=1;
+    orbit.style.cursor="pointer";
+  } else { tip.style.opacity=0; orbit.style.cursor="grab"; }
+});
+orbit.addEventListener("mouseleave", ()=>{ tip.style.opacity=0; });
+
+$("#playBtn").addEventListener("click", ()=>{
+  if(T>=T1-5) T=T0;
+  playing=!playing; paintPlay();
+});
+$("#liveBtn").addEventListener("click", ()=>{ playing=false; paintPlay(); setT(T1); });
+document.querySelectorAll("[data-speed]").forEach(b=>b.addEventListener("click",()=>{
+  speed=Number(b.dataset.speed);
+  document.querySelectorAll("[data-speed]").forEach(x=>x.classList.toggle("on",x===b));
+}));
+function paintPlay(){
+  $("#playBtn").textContent = playing ? "❚❚ PAUSAR" : "▶ REPLAY";
+  $("#playBtn").classList.toggle("on", playing);
+}
+addEventListener("keydown", ev=>{
+  if(ev.target.matches("input,textarea,select")) return;
+  const step = ev.shiftKey ? 600 : 60;
+  if(ev.code==="Space"){ ev.preventDefault(); $("#playBtn").click(); }
+  else if(ev.key==="ArrowLeft"){ playing=false; paintPlay(); setT(T-step); }
+  else if(ev.key==="ArrowRight"){ playing=false; paintPlay(); setT(T+step); }
+  else if(ev.key==="Home"){ playing=false; paintPlay(); setT(T0); }
+  else if(ev.key==="End"){ playing=false; paintPlay(); setT(T1); }
+});
+addEventListener("resize", ()=>{ renderStatic(); });
+
+/* ---------- start ---------- */
+load().then(()=>{ renderStatic(); requestAnimationFrame(frame); paintPlay(); })
+      .catch(err=>{ $("#tLabel").textContent="erro ao carregar"; console.error(err); });
+setInterval(()=>{ if(!playing) load().then(renderStatic).catch(()=>{}); }, 60000);
+</script>
+</body>
+</html>
