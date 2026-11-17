@@ -1,4 +1,38 @@
+# runtime e estado coletado (nunca versionar)
 data/
+runtime/
+state/
+state.json
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.log
+logs/
+
+# ambiente e segredos
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+secrets*
+*token*
+
+# backups locais (as receitas de rollback citam o caminho; ficam no disco)
+*.bak
+*.bak-*
+.backup*
+
+# python
 __pycache__/
-*.pyc
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# editores / SO
 .DS_Store
+Thumbs.db

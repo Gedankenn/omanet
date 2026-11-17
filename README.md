@@ -140,6 +140,12 @@ agregação, nenhuma tabela de rollup.
 └── tools/banner.py        # gera docs/banner.png
 ```
 
+## Documentação de UI
+
+Índice das telas (canônica, mocks arquivados e regras que sobrevivem a todas as
+versões) está fora do repo, no diretório do time:
+`/home/sabinho/OpenBot/Shared/omanet/INDEX.md`.
+
 ## Limites conhecidos
 
 - **MAC randomizado**: celulares trocam de MAC e o apelido fica no MAC antigo.

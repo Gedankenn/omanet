@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>OMA // SENTINELA — ameaças na LAN</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<style>
+@font-face{font-family:Chakra;src:url("/fonts/chakra.woff2") format("woff2");font-weight:600 700;font-display:swap}
+@font-face{font-family:JBM;src:url("/fonts/jetbrains-mono.woff2") format("woff2");font-weight:400 700;font-display:swap}
+:root{
+  --bg:#06070C; --panel:#0B0F18; --sunken:#0A0C14; --line:#1B2433; --line-hi:#2C3A50;
+  --ink:#DDF6FF; --dim:#A9BCD2; --mute:#8496AC;
+  --cyan:#22E8FF; --magenta:#FF2E88; --lime:#9CFF4A; --amber:#FFC24A; --red:#FF4D5E; --violet:#8A6BFF;
+  --disp:"Chakra",system-ui,sans-serif; --mono:"JBM",ui-monospace,monospace; --r:10px; --r-sm:6px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 12.5px/1.5 var(--mono);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;opacity:.2;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.45) 2px 3px)}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.wrap{width:min(100% - 32px,1100px);margin:0 auto;padding:14px 0 40px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.mark{font:700 9px/1 var(--mono);letter-spacing:1.6px;color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 40%,transparent);
+  border-radius:var(--r-sm);background:color-mix(in srgb,var(--cyan) 8%,transparent);padding:9px 8px}
+.brand{font:700 18px/1 var(--disp);letter-spacing:.1em}
+.brand b{color:var(--magenta)}
+.brand span{display:block;font:400 9px/1.6 var(--mono);letter-spacing:1.5px;color:var(--mute);margin-top:3px}
+.hud{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-hi);border-radius:var(--r-sm);
+  background:var(--panel);padding:7px 9px;font:400 10px/1 var(--mono);letter-spacing:.8px;color:var(--dim)}
+.chip b{font:700 12px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.btn{min-height:36px;padding:0 13px;border-radius:var(--r-sm);border:1px solid var(--line-hi);background:var(--panel);
+  color:var(--dim);font:700 9.5px/1 var(--mono);letter-spacing:1.2px;text-transform:uppercase}
+.btn:hover{color:var(--ink);border-color:var(--cyan)}
+.btn.go{border-color:color-mix(in srgb,var(--lime) 55%,transparent);background:color-mix(in srgb,var(--lime) 12%,transparent);color:var(--lime)}
+.btn[aria-pressed="true"]{border-color:var(--cyan);color:var(--cyan)}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 10px}
+.sev{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:var(--r-sm);
+  border:1px solid var(--line-hi);background:var(--sunken);font:700 9.5px/1 var(--mono);letter-spacing:.9px}
+.sev i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.sev.critical{color:var(--red)} .sev.warn{color:var(--amber)} .sev.notice{color:var(--cyan)} .sev.info{color:var(--mute)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0 16px}
+.kpi{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:11px 12px}
+.kpi b{display:block;font:700 26px/1 var(--disp);font-variant-numeric:tabular-nums}
+.kpi span{font:400 9px/1 var(--mono);letter-spacing:1.2px;color:var(--mute)}
+.kpi.c b{color:var(--red)} .kpi.w b{color:var(--amber)} .kpi.n b{color:var(--cyan)} .kpi.i b{color:var(--dim)}
+table{width:100%;border-collapse:collapse;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+th{font:700 9px/1 var(--mono);letter-spacing:1.2px;color:var(--mute);text-align:left;padding:9px 10px;
+  background:var(--sunken);border-bottom:1px solid var(--line);text-transform:uppercase}
+td{padding:9px 10px;border-bottom:1px solid #121a26;vertical-align:top;font-size:11.5px}
+tr:last-child td{border-bottom:0}
+tr:hover td{background:rgba(34,232,255,.03)}
+.sevpill{display:inline-block;font:700 8.5px/1 var(--mono);letter-spacing:.9px;border-radius:4px;padding:4px 6px;border:1px solid currentColor}
+.sevpill.critical{color:var(--red)} .sevpill.warn{color:var(--amber)} .sevpill.notice{color:var(--cyan)} .sevpill.info{color:var(--mute)}
+.rule{color:var(--ink);font-weight:700}
+.det{color:var(--dim)}
+.ip{color:var(--cyan);font-variant-numeric:tabular-nums}
+.mono{color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vazio{padding:26px;text-align:center;color:var(--mute);border:1px dashed var(--line-hi);border-radius:var(--r)}
+.nota{margin-top:18px;border-left:2px solid var(--line-hi);padding:8px 12px;color:var(--mute);font-size:10.5px;line-height:1.6}
+.nota b{color:var(--dim)}
+@media(max-width:760px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .esconde{display:none}
+  td,th{padding:8px 7px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="mark">OMA</span>
+    <div class="brand">SENTINELA <b>//</b> LAN<span>detecção leve · ARP + portas · 192.168.5.0/24</span></div>
+    <div class="hud">
+      <span class="chip">avaliado <b id="quando">—</b></span>
+      <button class="btn go" id="reBtn" type="button">REAVALIAR</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="kpi c"><b id="kCrit">0</b><span>CRÍTICO</span></div>
+    <div class="kpi w"><b id="kWarn">0</b><span>ALERTA</span></div>
+    <div class="kpi n"><b id="kNotice">0</b><span>AVISO</span></div>
+    <div class="kpi i"><b id="kInfo">0</b><span>INFO</span></div>
+  </div>
+
+  <div class="filtros" role="group" aria-label="filtrar por severidade">
+    <button class="btn" data-sev="" aria-pressed="true" type="button">TODOS</button>
+    <button class="btn" data-sev="critical" type="button"><span class="sev critical"><i></i>CRÍTICO</span></button>
+    <button class="btn" data-sev="warn" type="button"><span class="sev warn"><i></i>ALERTA</span></button>
+    <button class="btn" data-sev="notice" type="button"><span class="sev notice"><i></i>AVISO</span></button>
+    <button class="btn" data-sev="info" type="button"><span class="sev info"><i></i>INFO</span></button>
+  </div>
+
+  <div id="lista"></div>
+
+  <p class="nota">
+    <b>O que é:</b> regras sobre o que o omanet já coleta — quem está na LAN (ARP) e quais portas de serviço respondem.
+    Detecta troca do MAC do gateway, dois aparelhos no mesmo IP, serviço arriscado exposto (telnet, FTP, RDP, VNC, SMB, bancos),
+    aparelho novo sem identificação, MAC aleatório e sensor cego.
+    <b>O que não é:</b> não vê pacote, não vê conteúdo, não detecta exploração, DNS tunneling ou exfiltração — para isso precisaria de
+    espelho de porta/IDS com captura. Um falso positivo de "MAC aleatório" é normal: celular moderno muda de MAC por privacidade.
+  </p>
+</div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const SEV_LABEL = {critical:"CRÍTICO", warn:"ALERTA", notice:"AVISO", info:"INFO"};
+let dados = null, filtro = "";
+
+function hora(ts){ return new Date(ts*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }
+function quando(ts){
+  const d = new Date(ts*1000), hoje = new Date();
+  const mesmoDia = d.toDateString() === hoje.toDateString();
+  return (mesmoDia ? "" : d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" ") + hora(ts);
+}
+
+async function carregar(){
+  const r = await fetch("/api/threats", {cache:"no-store"});
+  dados = await r.json();
+  pintar();
+}
+
+function pintar(){
+  const s = dados.by_severity || {};
+  $("#kCrit").textContent = s.critical || 0;
+  $("#kWarn").textContent = s.warn || 0;
+  $("#kNotice").textContent = s.notice || 0;
+  $("#kInfo").textContent = s.info || 0;
+  $("#quando").textContent = dados.evaluated_at ? quando(dados.evaluated_at) : "—";
+  const itens = (dados.items || []).filter(i => !filtro || i.severity === filtro);
+  if(!itens.length){
+    $("#lista").innerHTML = '<div class="vazio">' +
+      (dados.total ? "nada nesta severidade" : "nenhum achado agora — a LAN está dentro do esperado") + '</div>';
+    return;
+  }
+  const linhas = itens.map(i => `
+    <tr>
+      <td><span class="sevpill ${i.severity}">${SEV_LABEL[i.severity] || i.severity.toUpperCase()}</span></td>
+      <td class="rule">${i.rule}</td>
+      <td class="ip">${i.ip || "—"}</td>
+      <td class="mono">${i.port || "—"}</td>
+      <td class="det">${i.detail || ""}</td>
+      <td class="mono">${i.count}× · ${quando(i.last_ts)}</td>
+    </tr>`).join("");
+  $("#lista").innerHTML = `<table>
+    <thead><tr><th>severidade</th><th>regra</th><th>ip</th><th>porta</th><th>o que foi visto</th><th>repetições</th></tr></thead>
+    <tbody>${linhas}</tbody></table>`;
+}
+
+document.querySelectorAll("[data-sev]").forEach(b => b.addEventListener("click", () => {
+  filtro = b.dataset.sev;
+  document.querySelectorAll("[data-sev]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  pintar();
+}));
+
+$("#reBtn").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget;
+  btn.disabled = true; btn.textContent = "AVALIANDO…";
+  try{
+    await fetch("/api/threats/scan", {method:"POST"});
+    await carregar();
+  } finally {
+    btn.disabled = false; btn.textContent = "REAVALIAR";
+  }
+});
+
+carregar().catch(err => { $("#lista").innerHTML = '<div class="vazio">erro ao ler /api/threats</div>'; });
+setInterval(carregar, 30000);
+</script>
+</body>
+</html>
